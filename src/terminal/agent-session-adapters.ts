@@ -889,6 +889,13 @@ const geminiAdapter: AgentSessionAdapter = {
 			env.GEMINI_CLI_SYSTEM_SETTINGS_PATH = configPath;
 		}
 
+		const appendedSystemPrompt = resolveHomeAgentAppendSystemPrompt(input.taskId);
+		if (appendedSystemPrompt && !input.env?.GEMINI_SYSTEM_MD) {
+			const systemPromptPath = join(getHookAgentDirectory("gemini"), "system.md");
+			await ensureTextFile(systemPromptPath, appendedSystemPrompt);
+			env.GEMINI_SYSTEM_MD = systemPromptPath;
+		}
+
 		const trimmed = input.prompt.trim();
 		if (trimmed) {
 			args.push("-i", trimmed);
@@ -1183,9 +1190,13 @@ const opencodeAdapter: AgentSessionAdapter = {
 			}
 		}
 
+		const appendedSystemPrompt = resolveHomeAgentAppendSystemPrompt(input.taskId);
 		const trimmed = input.prompt.trim();
-		if (trimmed) {
-			args.push("--prompt", trimmed);
+		const fullPrompt =
+			appendedSystemPrompt && trimmed ? `${appendedSystemPrompt}\n\n${trimmed}` : appendedSystemPrompt || trimmed;
+
+		if (fullPrompt) {
+			args.push("--prompt", fullPrompt);
 			return {
 				args,
 				env,
