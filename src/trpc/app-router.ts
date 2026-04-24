@@ -55,6 +55,8 @@ import type {
 	RuntimeHookIngestResponse,
 	RuntimeOpenFileRequest,
 	RuntimeOpenFileResponse,
+	RuntimePasscodeUpdateRequest,
+	RuntimePasscodeUpdateResponse,
 	RuntimeProjectAddRequest,
 	RuntimeProjectAddResponse,
 	RuntimeProjectDirectoryPickerResponse,
@@ -144,6 +146,8 @@ import {
 	runtimeHookIngestResponseSchema,
 	runtimeOpenFileRequestSchema,
 	runtimeOpenFileResponseSchema,
+	runtimePasscodeUpdateRequestSchema,
+	runtimePasscodeUpdateResponseSchema,
 	runtimeProjectAddRequestSchema,
 	runtimeProjectAddResponseSchema,
 	runtimeProjectDirectoryPickerResponseSchema,
@@ -290,6 +294,7 @@ export interface RuntimeTrpcContext {
 		) => Promise<RuntimeCommandRunResponse>;
 		resetAllState: (scope: RuntimeTrpcWorkspaceScope | null) => Promise<RuntimeDebugResetAllStateResponse>;
 		openFile: (input: RuntimeOpenFileRequest) => Promise<RuntimeOpenFileResponse>;
+		updatePasscode: (input: RuntimePasscodeUpdateRequest) => Promise<RuntimePasscodeUpdateResponse>;
 	};
 	workspaceApi: {
 		loadGitSummary: (
@@ -585,6 +590,12 @@ export const runtimeAppRouter = t.router({
 			.output(runtimeOpenFileResponseSchema)
 			.mutation(async ({ ctx, input }) => {
 				return await ctx.runtimeApi.openFile(input);
+			}),
+		updatePasscode: t.procedure
+			.input(runtimePasscodeUpdateRequestSchema)
+			.output(runtimePasscodeUpdateResponseSchema)
+			.mutation(async ({ ctx, input }) => {
+				return await ctx.runtimeApi.updatePasscode(input);
 			}),
 	}),
 	workspace: t.router({
