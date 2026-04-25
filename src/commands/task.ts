@@ -106,6 +106,18 @@ function parseOptionalStringOrDefault(value: string | undefined): string | null 
 	return value;
 }
 
+function parseCustomArgs(values: (string | undefined)[]): string[] | undefined {
+	const args = values.filter((v): v is string => typeof v === "string" && v.trim().length > 0).map((v) => v.trim());
+	return args.length > 0 ? args : undefined;
+}
+
+function formatCustomArgs(customArgs: string[] | undefined): JsonRecord {
+	if (customArgs === undefined || customArgs.length === 0) {
+		return {};
+	}
+	return { customArgs: [...customArgs] };
+}
+
 type ParsedTaskClineReasoningEffort = RuntimeClineReasoningEffort | "default" | null | undefined;
 
 function parseTaskClineReasoningEffort(value: string | undefined): ParsedTaskClineReasoningEffort {
@@ -351,6 +363,7 @@ function formatTaskRecord(
 		autoReviewMode: task.autoReviewMode ?? "commit",
 		...(task.agentId ? { agentId: task.agentId } : {}),
 		...formatTaskClineSettings(task.clineSettings),
+		...formatCustomArgs(task.customArgs),
 		createdAt: task.createdAt,
 		updatedAt: task.updatedAt,
 		session: session
@@ -481,6 +494,7 @@ async function createTask(input: {
 	autoReviewMode?: "commit" | "pr" | "move_to_trash";
 	agentId?: RuntimeAgentId;
 	clineSettings?: RuntimeTaskClineSettings;
+	customArgs?: string[];
 }): Promise<JsonRecord> {
 	const workspaceRepoPath = await resolveWorkspaceRepoPath(input.projectPath, input.cwd);
 	const workspaceId = await ensureRuntimeWorkspace(workspaceRepoPath);
@@ -501,6 +515,7 @@ async function createTask(input: {
 				autoReviewMode: input.autoReviewMode,
 				agentId: input.agentId,
 				clineSettings: input.clineSettings,
+				customArgs: input.customArgs,
 				baseRef: resolvedBaseRef,
 			},
 			() => generateUuid(),
@@ -525,6 +540,7 @@ async function createTask(input: {
 			autoReviewMode: created.autoReviewMode ?? "commit",
 			...(created.agentId ? { agentId: created.agentId } : {}),
 			...formatTaskClineSettings(created.clineSettings),
+			...formatCustomArgs(created.customArgs),
 		},
 	};
 }
@@ -543,6 +559,7 @@ async function updateTaskCommand(input: {
 	clineProviderId?: string | null;
 	clineModelId?: string | null;
 	clineReasoningEffort?: ParsedTaskClineReasoningEffort;
+	customArgs?: string[] | null;
 }): Promise<JsonRecord> {
 	if (
 		input.title === undefined &&
@@ -554,7 +571,8 @@ async function updateTaskCommand(input: {
 		input.agentId === undefined &&
 		input.clineProviderId === undefined &&
 		input.clineModelId === undefined &&
-		input.clineReasoningEffort === undefined
+		input.clineReasoningEffort === undefined &&
+		input.customArgs === undefined
 	) {
 		throw new Error("task update requires at least one field to change.");
 	}
@@ -582,6 +600,7 @@ async function updateTaskCommand(input: {
 			autoReviewMode: input.autoReviewMode ?? taskRecord.task.autoReviewMode ?? "commit",
 			agentId: input.agentId,
 			clineSettings: nextTaskClineSettings,
+			customArgs: input.customArgs,
 		});
 		if (!updatedTask.updated || !updatedTask.task) {
 			throw new Error(`Task "${input.taskId}" could not be updated.`);
@@ -1121,6 +1140,14 @@ export function registerTaskCommand(program: Command): void {
 		.option("--auto-review-mode <mode>", "Auto-review mode: commit | pr | move_to_trash.", parseAutoReviewMode)
 		.option("--agent-id <id>", "Agent override: cline | claude | codex | droid | gemini | opencode | default.")
 		.option(
+			"--custom-arg <value>",
+			"Custom CLI argument for the agent (can be used multiple times).",
+			(value, previous: string[] | undefined) => {
+				const prev = previous ?? [];
+				return [...prev, value];
+			},
+		)
+		.option(
 			"--cline-provider <id>",
 			'Cline provider override (e.g. anthropic, openai, cline). Use "default" for workspace default.',
 		)
@@ -1142,6 +1169,7 @@ export function registerTaskCommand(program: Command): void {
 				autoReviewEnabled?: unknown;
 				autoReviewMode?: "commit" | "pr" | "move_to_trash";
 				agentId?: string;
+				customArg?: string[];
 				clineProvider?: string;
 				clineModel?: string;
 				clineReasoningEffort?: string;
@@ -1158,6 +1186,7 @@ export function registerTaskCommand(program: Command): void {
 							autoReviewEnabled: parseOptionalBooleanOption(options.autoReviewEnabled, "--auto-review-enabled"),
 							autoReviewMode: options.autoReviewMode,
 							agentId: parseAgentId(options.agentId) ?? undefined,
+							customArgs: parseCustomArgs(options.customArg ?? []),
 							clineSettings: buildTaskClineSettingsForCreate({
 								providerId: parseOptionalStringOrDefault(options.clineProvider) ?? undefined,
 								modelId: parseOptionalStringOrDefault(options.clineModel) ?? undefined,
@@ -1184,6 +1213,14 @@ export function registerTaskCommand(program: Command): void {
 			'Agent override: cline | claude | codex | droid | gemini | opencode. Use "default" to clear.',
 		)
 		.option(
+			"--custom-arg <value>",
+			'Custom CLI argument (use multiple times). Pass "default" to clear.',
+			(value, previous: string[] | undefined) => {
+				const prev = previous ?? [];
+				return [...prev, value];
+			},
+		)
+		.option(
 			"--cline-provider <id>",
 			'Cline provider override (e.g. anthropic, openai, cline). Use "default" to clear.',
 		)
@@ -1203,6 +1240,7 @@ export function registerTaskCommand(program: Command): void {
 				autoReviewEnabled?: unknown;
 				autoReviewMode?: "commit" | "pr" | "move_to_trash";
 				agentId?: string;
+				customArg?: string[];
 				clineProvider?: string;
 				clineModel?: string;
 				clineReasoningEffort?: string;
@@ -1220,6 +1258,7 @@ export function registerTaskCommand(program: Command): void {
 							autoReviewEnabled: parseOptionalBooleanOption(options.autoReviewEnabled, "--auto-review-enabled"),
 							autoReviewMode: options.autoReviewMode,
 							agentId: parseAgentId(options.agentId),
+							customArgs: options.customArg ? parseCustomArgs(options.customArg) : undefined,
 							clineProviderId: parseOptionalStringOrDefault(options.clineProvider),
 							clineModelId: parseOptionalStringOrDefault(options.clineModel),
 							clineReasoningEffort: parseTaskClineReasoningEffort(options.clineReasoningEffort),
