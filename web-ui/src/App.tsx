@@ -286,6 +286,7 @@ export default function App(): ReactElement {
 
 	const {
 		isInlineTaskCreateOpen,
+		taskCreationNonce,
 		newTaskPrompt,
 		setNewTaskPrompt,
 		newTaskImages,
@@ -1112,6 +1113,7 @@ export default function App(): ReactElement {
 					onResetAllState={handleResetAllState}
 				/>
 				<TaskCreateDialog
+					key={`${isInlineTaskCreateOpen ? "open" : "closed"}-${taskCreationNonce}`}
 					open={isInlineTaskCreateOpen}
 					onOpenChange={handleCreateDialogOpenChange}
 					prompt={newTaskPrompt}
